@@ -2,7 +2,7 @@ import { it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { Mailbox, MAIL_MAX_HOPS } from '../../dist/mail/index.js';
+import { Mailbox, MAIL_MAX_HOPS, MAIL_POLL_MS } from '../../dist/mail/index.js';
 import { registerMail } from '../../dist/pi/mail.js';
 
 // Session mail (delta-3, context plans/managed-delivery-v0.3/delta-3 §6).
@@ -238,7 +238,9 @@ it('the watcher delivers without an explicit pump', async () => {
   await a.start();
   await b.start();
   await a.call({ verb: 'send', to: 'beta', body: 'watched' });
-  const deadline = Date.now() + 3000;
+  // fs.watch usually fires at once, but macOS FSEvents can drop or delay the
+  // notification; the polling safety net must then deliver within one period.
+  const deadline = Date.now() + MAIL_POLL_MS + 2000;
   while (!b.sent.length && Date.now() < deadline) await new Promise((r) => setTimeout(r, 25));
   expect(b.sent).toHaveLength(1);
 });
