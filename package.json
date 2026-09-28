@@ -1,6 +1,6 @@
 {
   "name": "@maolon/pi-relay",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Session mail and a durable local event relay for Pi: let Pi sessions message each other, and let external CLIs and extensions wake a session with events.",
   "keywords": [
     "pi-package",
