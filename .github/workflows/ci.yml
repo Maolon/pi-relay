@@ -46,7 +46,7 @@ jobs:
         run: |
           scratch=$(mktemp -d)
           trap 'rm -rf "$scratch"' EXIT
-          tarball=$(npm pack --ignore-scripts --pack-destination "$scratch" --json | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8"))[0].filename)')
+          tarball=$(npm pack --ignore-scripts --pack-destination "$scratch" --json | node -e 'const o=JSON.parse(require("fs").readFileSync(0,"utf8"));process.stdout.write((Array.isArray(o)?o:Object.values(o))[0].filename)')
           npm install --prefix "$scratch/consumer" --ignore-scripts --no-audit --no-fund "$scratch/$tarball"
           npm rebuild --prefix "$scratch/consumer" fs-ext --foreground-scripts
           "$scratch/consumer/node_modules/.bin/pi-relay" doctor
