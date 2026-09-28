@@ -5,11 +5,13 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 const root = mkdtempSync(join(tmpdir(), 'relay-pack-'));
 try {
-  const [pack] = JSON.parse(
+  // npm <= 11 prints an array of packs, npm >= 12 an object keyed by package name.
+  const packed = JSON.parse(
     execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', root], {
       encoding: 'utf8',
     }),
   );
+  const [pack] = Array.isArray(packed) ? packed : Object.values(packed);
   const unpack = join(root, 'unpack');
   mkdirSync(unpack);
   execFileSync('tar', ['-xzf', join(root, pack.filename), '-C', unpack]);

@@ -26,7 +26,7 @@ jobs:
           # No registry-url: setup-node would write GITHUB_TOKEN into .npmrc,
           # which shadows OIDC trusted publishing and fails with E404.
       - name: Upgrade npm (trusted publishing needs npm >= 11.5.1)
-        run: npm install -g npm@latest --force
+        run: npm install -g npm@11 --force
       - name: Decide whether this version is new
         id: version
         run: |
