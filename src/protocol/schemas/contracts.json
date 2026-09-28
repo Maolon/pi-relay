@@ -1,0 +1,2401 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pi-relay.local/schema/contracts.json",
+  "title": "RelayContract",
+  "$defs": {
+    "Json": {
+      "title": "Json",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Json"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Json"
+          }
+        }
+      ]
+    },
+    "ModelMode": {
+      "enum": [
+        "display",
+        "resume"
+      ],
+      "title": "ModelMode"
+    },
+    "PolicyRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/ModelMode"
+        },
+        "presentation": {
+          "enum": [
+            "live",
+            "card",
+            "none"
+          ]
+        }
+      },
+      "required": [
+        "model",
+        "presentation"
+      ],
+      "title": "PolicyRule"
+    },
+    "Policy": {
+      "type": "object",
+      "maxProperties": 64,
+      "additionalProperties": {
+        "$ref": "#/$defs/PolicyRule"
+      },
+      "title": "Policy"
+    },
+    "TypeManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "kind": {
+          "enum": [
+            "event",
+            "progress"
+          ]
+        },
+        "dataSchema": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Json"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "schemaVersion",
+        "kind",
+        "dataSchema"
+      ],
+      "title": "TypeManifest"
+    },
+    "Event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "event"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "subject": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "occurredAt": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "validUntil": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "data": {
+          "$ref": "#/$defs/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "type",
+        "schemaVersion",
+        "data"
+      ],
+      "title": "Event"
+    },
+    "Progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "progress"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "streamId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "subject": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "snapshot": {
+          "$ref": "#/$defs/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "type",
+        "schemaVersion",
+        "streamId",
+        "revision",
+        "snapshot"
+      ],
+      "title": "Progress"
+    },
+    "Value": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Event"
+        },
+        {
+          "$ref": "#/$defs/Progress"
+        }
+      ],
+      "title": "Value"
+    },
+    "ChannelConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TypeManifest"
+          },
+          "maxItems": 64
+        },
+        "allowedModes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelMode"
+          },
+          "maxItems": 2
+        },
+        "maxAutoTargets": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "localTrust": {
+          "type": "boolean",
+          "description": "Delta-2 trust-distance layering: channel opts into local standing binding (no invite ceremony; same-home same-realm direct bind). Default false keeps the full invite ceremony."
+        }
+      },
+      "required": [
+        "id",
+        "types",
+        "allowedModes",
+        "maxAutoTargets"
+      ],
+      "title": "ChannelConfig"
+    },
+    "SourceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "realm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "home": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChannelConfig"
+          },
+          "maxItems": 32
+        },
+        "ownerToken": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "publisherTokens": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "sourceId",
+        "realm",
+        "home",
+        "channels",
+        "ownerToken",
+        "publisherTokens"
+      ],
+      "title": "SourceConfig"
+    },
+    "SourceHandle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "kind": {
+          "const": "source"
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "realm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "discoveryFile": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "credential": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "sourceId",
+        "realm",
+        "discoveryFile",
+        "credential"
+      ],
+      "title": "SourceHandle"
+    },
+    "BindingHandle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "kind": {
+          "const": "binding"
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "targetFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "realm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "discoveryFile": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "spoolDir": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "credential": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "proofKeyId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "proofKey": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "bindingId",
+        "sourceId",
+        "channelId",
+        "targetFingerprint",
+        "realm",
+        "discoveryFile",
+        "spoolDir",
+        "credential",
+        "proofKeyId",
+        "proofKey",
+        "expiresAt"
+      ],
+      "title": "BindingHandle"
+    },
+    "Invite": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "kind": {
+          "const": "invite"
+        },
+        "inviteId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "realm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "discoveryFile": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "credential": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "bindingExpiresAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TypeManifest"
+          },
+          "maxItems": 64
+        },
+        "allowedModes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelMode"
+          },
+          "maxItems": 2
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "inviteId",
+        "sourceId",
+        "channelId",
+        "realm",
+        "discoveryFile",
+        "credential",
+        "expiresAt",
+        "bindingExpiresAt",
+        "types",
+        "allowedModes"
+      ],
+      "title": "Invite"
+    },
+    "TargetProposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "inviteId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "targetFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "realm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "policy": {
+          "$ref": "#/$defs/Policy"
+        },
+        "types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TypeManifest"
+          },
+          "maxItems": 64
+        },
+        "affinity": {
+          "enum": [
+            "branch",
+            "session"
+          ]
+        },
+        "originAnchor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "standing": {
+          "type": "boolean",
+          "description": "Delta-2: local standing binding. When true, expiresAt carries STANDING_EXPIRES_AT (9007199254740991), inviteId is the literal \"local\", and the binding is exempt from the cross-target overlap guard."
+        }
+      },
+      "required": [
+        "operationId",
+        "inviteId",
+        "sourceId",
+        "channelId",
+        "targetFingerprint",
+        "realm",
+        "expiresAt",
+        "policy",
+        "types",
+        "affinity",
+        "originAnchor"
+      ],
+      "title": "TargetProposal"
+    },
+    "PreparedBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "proposal": {
+          "$ref": "#/$defs/TargetProposal"
+        },
+        "handle": {
+          "$ref": "#/$defs/BindingHandle"
+        },
+        "preparedDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "bindingId",
+        "proposal",
+        "handle",
+        "preparedDigest"
+      ],
+      "title": "PreparedBinding"
+    },
+    "MembershipProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "targetFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "preparedDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "membershipRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "proof": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "bindingId",
+        "sourceId",
+        "channelId",
+        "targetFingerprint",
+        "operationId",
+        "preparedDigest",
+        "membershipRevision",
+        "expiresAt",
+        "proof"
+      ],
+      "title": "MembershipProof"
+    },
+    "RoutePacket": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "packetVersion": {
+          "const": 1
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "event": {
+          "$ref": "#/$defs/Event"
+        },
+        "sourceEventDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fanoutId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "membershipRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "routeCreatedAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "routeValidUntil": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "policySnapshotId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "allowedModelModes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelMode"
+          },
+          "maxItems": 2
+        },
+        "sourceWakeReservationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "proofKeyId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "proof": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "packetVersion",
+        "bindingId",
+        "sourceId",
+        "channelId",
+        "event",
+        "sourceEventDigest",
+        "fanoutId",
+        "membershipRevision",
+        "routeCreatedAt",
+        "routeValidUntil",
+        "policySnapshotId",
+        "allowedModelModes",
+        "proofKeyId",
+        "proof"
+      ],
+      "title": "RoutePacket"
+    },
+    "GrantRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "eventTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+          },
+          "maxItems": 64
+        },
+        "maxClaims": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "ttlMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1800000
+        },
+        "sessionScoped": {
+          "type": "boolean"
+        },
+        "standing": {
+          "type": "boolean",
+          "description": "Delta-2: standing grant. When true, maxClaims and ttlMs are schema-required but semantically ignored (any in-range values accepted); claim checks skip expiry and claim-cap. Budget is bounded by eligibility gates, fencing and the managed guard instead."
+        }
+      },
+      "required": [
+        "eventTypes",
+        "maxClaims",
+        "ttlMs"
+      ],
+      "title": "GrantRequest"
+    },
+    "OwnerCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "action": {
+          "enum": [
+            "pause",
+            "resume",
+            "arm",
+            "disarm",
+            "seal",
+            "revoke",
+            "renew",
+            "resolve-unknown",
+            "rotate-credential"
+          ]
+        },
+        "grant": {
+          "$ref": "#/$defs/GrantRequest"
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "holdReason": {
+          "enum": [
+            "manual",
+            "navigation",
+            "recovery",
+            "foreground-changed",
+            "host-aborted"
+          ]
+        },
+        "approveCurrentBranch": {
+          "type": "boolean"
+        },
+        "deliveryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "resolution": {
+          "const": "skip-replay-and-unblock"
+        }
+      },
+      "required": [
+        "operationId",
+        "expectedRevision",
+        "action"
+      ],
+      "title": "OwnerCommand"
+    },
+    "BridgeError": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retryAfterMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "currentRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "title": "BridgeError"
+    },
+    "Observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "enum": [
+            "runtime-entry",
+            "file-entry"
+          ]
+        },
+        "entryKind": {
+          "const": "custom_message"
+        },
+        "entryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "observedAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "evidence",
+        "entryKind",
+        "entryId",
+        "observedAt"
+      ],
+      "title": "Observation"
+    },
+    "EventReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "acceptedAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "payloadDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "effectiveValidUntil": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "delivery": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "enum": [
+                "not-requested",
+                "pending",
+                "held",
+                "dispatch-intent",
+                "submitted",
+                "recorded",
+                "unknown",
+                "suppressed",
+                "expired"
+              ]
+            },
+            "holdReasons": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "maxItems": 32
+            },
+            "deliveryId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "submittedAt": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "observation": {
+              "$ref": "#/$defs/Observation"
+            },
+            "controlAfterSubmission": {
+              "enum": [
+                "paused",
+                "revoked",
+                "expired"
+              ]
+            }
+          },
+          "required": [
+            "disposition"
+          ]
+        },
+        "presentation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "enum": [
+                "none",
+                "buffered",
+                "projected",
+                "archived",
+                "unavailable"
+              ]
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "bindingId",
+        "sourceId",
+        "channelId",
+        "eventId",
+        "acceptedAt",
+        "payloadDigest",
+        "effectiveValidUntil",
+        "delivery",
+        "presentation",
+        "cursor"
+      ],
+      "title": "EventReceipt"
+    },
+    "AdmissionResult": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "outcome": {
+              "const": "accepted"
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "acceptedAt": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "bindingAdmissionSeq": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "duplicate": {
+              "type": "boolean"
+            },
+            "receiptCursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "outcome",
+            "eventId",
+            "acceptedAt",
+            "bindingAdmissionSeq",
+            "duplicate",
+            "receiptCursor"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "outcome": {
+              "const": "staged"
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "durability": {
+              "const": "producer-outbox"
+            }
+          },
+          "required": [
+            "outcome",
+            "eventId",
+            "durability"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "outcome": {
+              "const": "admission-unknown"
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "staged": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "outcome",
+            "eventId",
+            "staged"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "outcome": {
+              "const": "buffered"
+            },
+            "streamId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "durability": {
+              "const": "none"
+            }
+          },
+          "required": [
+            "outcome",
+            "streamId",
+            "revision",
+            "durability"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "outcome": {
+              "const": "dropped"
+            },
+            "reason": {
+              "enum": [
+                "progress-offline",
+                "superseded"
+              ]
+            }
+          },
+          "required": [
+            "outcome",
+            "reason"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "outcome": {
+              "const": "rejected"
+            },
+            "error": {
+              "$ref": "#/$defs/BridgeError"
+            }
+          },
+          "required": [
+            "outcome",
+            "error"
+          ]
+        }
+      ],
+      "title": "AdmissionResult"
+    },
+    "FanoutRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routeId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "admission": {
+          "enum": [
+            "accepted",
+            "staged",
+            "pending-registration",
+            "rejected",
+            "unknown",
+            "source-staged"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      },
+      "required": [
+        "routeId",
+        "admission"
+      ],
+      "title": "FanoutRoute"
+    },
+    "FanoutResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceState": {
+          "enum": [
+            "source-staged",
+            "empty-audience",
+            "buffered",
+            "dropped"
+          ]
+        },
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "fanoutId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "membershipRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FanoutRoute"
+          },
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "sourceState",
+        "routes"
+      ],
+      "title": "FanoutResult"
+    },
+    "Discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "kind": {
+          "enum": [
+            "source",
+            "binding"
+          ]
+        },
+        "identity": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "realm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "endpoint": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "attachmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "ownerEpoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "identity",
+        "realm",
+        "endpoint",
+        "attachmentId",
+        "ownerEpoch"
+      ],
+      "title": "Discovery"
+    },
+    "ConnectResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "maxItems": 32
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "targetFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "realm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "attachmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "ownerEpoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "bindingRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "preparedDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "membershipRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sourceRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "features",
+        "sourceId",
+        "realm",
+        "attachmentId",
+        "ownerEpoch",
+        "limits"
+      ],
+      "title": "ConnectResult"
+    },
+    "ConnectRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "connect"
+        },
+        "credential": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "inviteId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "requiredFeatures": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "credential",
+        "requiredFeatures"
+      ],
+      "title": "ConnectRequest"
+    },
+    "PublishRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "publish"
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "bindingRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "attachmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "value": {
+          "$ref": "#/$defs/Value"
+        },
+        "packet": {
+          "$ref": "#/$defs/RoutePacket"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "bindingId",
+        "bindingRevision",
+        "attachmentId"
+      ],
+      "title": "PublishRequest"
+    },
+    "ReceiptRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "receipt"
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "bindingRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "attachmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "bindingId",
+        "bindingRevision",
+        "attachmentId",
+        "eventId"
+      ],
+      "title": "ReceiptRequest"
+    },
+    "WatchRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "watch"
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "bindingRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "attachmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "after": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "bindingId",
+        "bindingRevision",
+        "attachmentId",
+        "after",
+        "limit"
+      ],
+      "title": "WatchRequest"
+    },
+    "SourcePublishRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "source.publish"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "value": {
+          "$ref": "#/$defs/Value"
+        },
+        "autoRequired": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "channelId",
+        "value"
+      ],
+      "title": "SourcePublishRequest"
+    },
+    "SourceReceiptRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "source.receipt"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "channelId",
+        "eventId"
+      ],
+      "title": "SourceReceiptRequest"
+    },
+    "InviteRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "source.invite"
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "ttlMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "bindingTtlMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2592000000
+        },
+        "allowResume": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "operationId",
+        "channelId",
+        "ttlMs",
+        "bindingTtlMs",
+        "allowResume"
+      ],
+      "title": "InviteRequest"
+    },
+    "EnrollRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "source.enroll"
+        },
+        "prepared": {
+          "$ref": "#/$defs/PreparedBinding"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "prepared"
+      ],
+      "title": "EnrollRequest"
+    },
+    "SourceControlRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "source.control"
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "action": {
+          "enum": [
+            "close",
+            "revoke",
+            "replay"
+          ]
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "operationId",
+        "channelId",
+        "action",
+        "expectedRevision"
+      ],
+      "title": "SourceControlRequest"
+    },
+    "SourceWithdrawRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "source.withdraw"
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "preparedDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "bindingId",
+        "operationId",
+        "preparedDigest"
+      ],
+      "title": "SourceWithdrawRequest"
+    },
+    "RouteRevokeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "route.revoke"
+        },
+        "bindingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "bindingRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "attachmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op",
+        "bindingId",
+        "bindingRevision",
+        "attachmentId",
+        "operationId"
+      ],
+      "title": "RouteRevokeRequest"
+    },
+    "UnsupportedRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "op": {
+          "const": "egress"
+        },
+        "value": {
+          "$ref": "#/$defs/Json"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op"
+      ],
+      "title": "UnsupportedRequest"
+    },
+    "Request": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConnectRequest"
+        },
+        {
+          "$ref": "#/$defs/PublishRequest"
+        },
+        {
+          "$ref": "#/$defs/ReceiptRequest"
+        },
+        {
+          "$ref": "#/$defs/WatchRequest"
+        },
+        {
+          "$ref": "#/$defs/SourcePublishRequest"
+        },
+        {
+          "$ref": "#/$defs/SourceReceiptRequest"
+        },
+        {
+          "$ref": "#/$defs/InviteRequest"
+        },
+        {
+          "$ref": "#/$defs/EnrollRequest"
+        },
+        {
+          "$ref": "#/$defs/SourceControlRequest"
+        },
+        {
+          "$ref": "#/$defs/SourceWithdrawRequest"
+        },
+        {
+          "$ref": "#/$defs/RouteRevokeRequest"
+        },
+        {
+          "$ref": "#/$defs/UnsupportedRequest"
+        },
+        {
+          "$ref": "#/$defs/SourceStatusRequest"
+        }
+      ],
+      "title": "Request"
+    },
+    "Response": {
+      "title": "Response",
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 1
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/Json"
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "ok",
+            "result"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 1
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "ok": {
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/BridgeError"
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "ok",
+            "error"
+          ]
+        }
+      ]
+    },
+    "SourceStatusRequest": {
+      "title": "SourceStatusRequest",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "const": "pi-relay"
+        },
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "op": {
+          "const": "source.status"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor",
+        "requestId",
+        "op"
+      ]
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/ModelMode"
+    },
+    {
+      "$ref": "#/$defs/PolicyRule"
+    },
+    {
+      "$ref": "#/$defs/Policy"
+    },
+    {
+      "$ref": "#/$defs/TypeManifest"
+    },
+    {
+      "$ref": "#/$defs/Event"
+    },
+    {
+      "$ref": "#/$defs/Progress"
+    },
+    {
+      "$ref": "#/$defs/Value"
+    },
+    {
+      "$ref": "#/$defs/ChannelConfig"
+    },
+    {
+      "$ref": "#/$defs/SourceConfig"
+    },
+    {
+      "$ref": "#/$defs/SourceHandle"
+    },
+    {
+      "$ref": "#/$defs/BindingHandle"
+    },
+    {
+      "$ref": "#/$defs/Invite"
+    },
+    {
+      "$ref": "#/$defs/TargetProposal"
+    },
+    {
+      "$ref": "#/$defs/PreparedBinding"
+    },
+    {
+      "$ref": "#/$defs/MembershipProof"
+    },
+    {
+      "$ref": "#/$defs/RoutePacket"
+    },
+    {
+      "$ref": "#/$defs/GrantRequest"
+    },
+    {
+      "$ref": "#/$defs/OwnerCommand"
+    },
+    {
+      "$ref": "#/$defs/BridgeError"
+    },
+    {
+      "$ref": "#/$defs/Observation"
+    },
+    {
+      "$ref": "#/$defs/EventReceipt"
+    },
+    {
+      "$ref": "#/$defs/AdmissionResult"
+    },
+    {
+      "$ref": "#/$defs/FanoutRoute"
+    },
+    {
+      "$ref": "#/$defs/FanoutResult"
+    },
+    {
+      "$ref": "#/$defs/Discovery"
+    },
+    {
+      "$ref": "#/$defs/ConnectResult"
+    },
+    {
+      "$ref": "#/$defs/ConnectRequest"
+    },
+    {
+      "$ref": "#/$defs/PublishRequest"
+    },
+    {
+      "$ref": "#/$defs/ReceiptRequest"
+    },
+    {
+      "$ref": "#/$defs/WatchRequest"
+    },
+    {
+      "$ref": "#/$defs/SourcePublishRequest"
+    },
+    {
+      "$ref": "#/$defs/SourceReceiptRequest"
+    },
+    {
+      "$ref": "#/$defs/InviteRequest"
+    },
+    {
+      "$ref": "#/$defs/EnrollRequest"
+    },
+    {
+      "$ref": "#/$defs/SourceControlRequest"
+    },
+    {
+      "$ref": "#/$defs/SourceWithdrawRequest"
+    },
+    {
+      "$ref": "#/$defs/RouteRevokeRequest"
+    },
+    {
+      "$ref": "#/$defs/UnsupportedRequest"
+    },
+    {
+      "$ref": "#/$defs/Request"
+    },
+    {
+      "$ref": "#/$defs/Response"
+    }
+  ]
+}

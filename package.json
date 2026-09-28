@@ -1,0 +1,160 @@
+{
+  "name": "@maolon/pi-relay",
+  "version": "0.1.0",
+  "description": "Session mail and a durable local event relay for Pi: let Pi sessions message each other, and let external CLIs and extensions wake a session with events.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "relay",
+    "events",
+    "session-mail",
+    "agents"
+  ],
+  "homepage": "https://github.com/Maolon/pi-relay#readme",
+  "bugs": {
+    "url": "https://github.com/Maolon/pi-relay/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Maolon/pi-relay.git"
+  },
+  "license": "MIT",
+  "author": "Maolon",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "pi-relay": "dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol/index.d.ts",
+      "import": "./dist/protocol/index.js",
+      "require": "./dist/protocol/index.js",
+      "default": "./dist/protocol/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js",
+      "require": "./dist/client/index.js",
+      "default": "./dist/client/index.js"
+    },
+    "./source": {
+      "types": "./dist/source/index.d.ts",
+      "import": "./dist/source/index.js",
+      "require": "./dist/source/index.js",
+      "default": "./dist/source/index.js"
+    },
+    "./extension": {
+      "types": "./dist/pi/index.d.ts",
+      "import": "./dist/pi/index.js",
+      "require": "./dist/pi/index.js",
+      "default": "./dist/pi/index.js"
+    },
+    "./schemas/*": "./dist/protocol/schemas/*",
+    "./target": {
+      "types": "./dist/target/host.d.ts",
+      "import": "./dist/target/host.js",
+      "require": "./dist/target/host.js",
+      "default": "./dist/target/host.js"
+    },
+    "./consumer": {
+      "types": "./dist/consumer/index.d.ts",
+      "import": "./dist/consumer/index.js",
+      "require": "./dist/consumer/index.js",
+      "default": "./dist/consumer/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "examples",
+    "LICENSE",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./dist/pi/index.js"
+    ]
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "gate:native": "node scripts/check-native.mjs",
+    "typecheck": "npm run check:generated && tsc --noEmit",
+    "build": "tsc",
+    "test": "vitest run",
+    "generate:types": "node scripts/generate-types.mjs",
+    "check:generated": "node scripts/generate-types.mjs --check",
+    "check:imports": "node scripts/check-imports.mjs",
+    "pretest": "npm run build",
+    "test:ci": "npm run gate:native && npm run typecheck && npm run build && npm run check:imports && vitest run --reporter=default --reporter=json --outputFile=artifacts/implementation/T11/tests.json",
+    "test:stress": "node scripts/stress.mjs",
+    "test:all": "npm run test:ci && npm run test:stress",
+    "pack:check": "node scripts/pack-check.mjs",
+    "test:package": "node scripts/package-smoke.mjs",
+    "test:protocol": "node scripts/test-suite.mjs protocol",
+    "test:store": "node scripts/test-suite.mjs store",
+    "test:target": "node scripts/test-suite.mjs target",
+    "test:transport": "node scripts/test-suite.mjs transport",
+    "test:membership": "node scripts/test-suite.mjs membership",
+    "test:source": "node scripts/test-suite.mjs source",
+    "test:fanout": "node scripts/test-suite.mjs fanout",
+    "test:staging": "node scripts/test-suite.mjs staging",
+    "test:pi": "node scripts/test-suite.mjs pi",
+    "test:controls": "node scripts/test-suite.mjs controls",
+    "test:presentation": "node scripts/test-suite.mjs presentation",
+    "test:cli": "node scripts/test-suite.mjs cli",
+    "test:e2e": "node scripts/test-suite.mjs e2e",
+    "test:security": "node scripts/test-suite.mjs security",
+    "test:faults": "node scripts/test-suite.mjs faults",
+    "prepublishOnly": "npm run build && npm run pack:check"
+  },
+  "dependencies": {
+    "ajv": "8.17.1",
+    "better-sqlite3": "13.0.3",
+    "canonicalize": "2.1.0",
+    "fs-ext": "2.1.1"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@types/better-sqlite3": "7.6.13",
+    "@types/fs-ext": "2.0.3",
+    "@types/node": "22.15.30",
+    "fast-check": "4.1.1",
+    "json-schema-to-typescript": "15.0.4",
+    "typebox": "1.3.7",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}

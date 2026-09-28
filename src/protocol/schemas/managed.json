@@ -1,0 +1,1174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pi-relay:relay-next:delta-1",
+  "title": "relay managed delivery wire contract (delta-1 merged revision)",
+  "description": "PROPOSED, not implemented, not approved. Supersedes urn:pi-watcher:relay-next:1 (byte-copy in ../contracts/) as the working model per review M1/M2/m3 and amendments A1/A2/A5. Managed ops (minor 2) wrap params; 1.1 ops stay flat and are defined elsewhere.",
+  "$defs": {
+    "Scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "id",
+        "revision"
+      ]
+    },
+    "Event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "event"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "data": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "type",
+        "schemaVersion",
+        "occurredAt",
+        "validUntil",
+        "data"
+      ]
+    },
+    "ManagedOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "audienceRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "consumerProfileId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "requestedMode": {
+          "type": "string",
+          "enum": [
+            "display",
+            "resume"
+          ]
+        }
+      },
+      "required": [
+        "audienceRef",
+        "scope",
+        "consumerProfileId",
+        "requestedMode"
+      ]
+    },
+    "ManagedPublish": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "$ref": "#/$defs/Event"
+        },
+        "options": {
+          "$ref": "#/$defs/ManagedOptions"
+        }
+      },
+      "required": [
+        "event",
+        "options"
+      ]
+    },
+    "ApplicationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "stale",
+            "rejected"
+          ]
+        },
+        "applicationRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "APPLIED",
+            "STALE_EPISODE",
+            "OWNER_MISMATCH",
+            "ALREADY_CLOSED",
+            "INVALID_RESPONSE"
+          ]
+        }
+      },
+      "required": [
+        "outcome",
+        "applicationRevision",
+        "code"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "applied"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "const": "APPLIED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "stale"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "enum": [
+                  "STALE_EPISODE",
+                  "ALREADY_CLOSED"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "rejected"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "enum": [
+                  "OWNER_MISMATCH",
+                  "INVALID_RESPONSE"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ConsumerResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "responseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "deliveryRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "responseType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "data": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "target_staged",
+            "source_recorded",
+            "application_applied"
+          ]
+        },
+        "applicationResult": {
+          "$ref": "#/$defs/ApplicationResult"
+        }
+      },
+      "required": [
+        "responseId",
+        "deliveryRef",
+        "responseType",
+        "schemaVersion",
+        "data",
+        "createdAt",
+        "state"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "application_applied"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "applicationResult": true
+            },
+            "required": [
+              "applicationResult"
+            ]
+          }
+        }
+      ]
+    },
+    "DeliveryObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "type": "string",
+          "enum": [
+            "runtime-entry",
+            "file-entry"
+          ]
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "evidence",
+        "observedAt"
+      ]
+    },
+    "RouteReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routeRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "targetRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "targetUpdatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "freshness": {
+          "type": "string",
+          "enum": [
+            "fresh",
+            "stale",
+            "offline"
+          ]
+        },
+        "admission": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "staged",
+            "rejected",
+            "unknown"
+          ]
+        },
+        "delivery": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "held",
+            "intent",
+            "submitted",
+            "recorded",
+            "unknown",
+            "suppressed",
+            "expired",
+            "withdrawn"
+          ]
+        },
+        "withdrawal": {
+          "type": "string",
+          "enum": [
+            "none",
+            "pending",
+            "prevented",
+            "too_late",
+            "unknown"
+          ]
+        },
+        "observation": {
+          "$ref": "#/$defs/DeliveryObservation"
+        }
+      },
+      "required": [
+        "routeRef",
+        "targetRevision",
+        "freshness",
+        "admission",
+        "delivery",
+        "withdrawal"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "delivery": {
+                "const": "recorded"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "observation": true
+            },
+            "required": [
+              "observation"
+            ]
+          }
+        }
+      ]
+    },
+    "ManagedReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "sourceState": {
+          "type": "string",
+          "enum": [
+            "captured",
+            "empty_audience",
+            "rejected",
+            "unknown"
+          ]
+        },
+        "sourceCursor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "routes": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/RouteReceipt"
+          }
+        },
+        "responses": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/ConsumerResponse"
+          }
+        }
+      },
+      "required": [
+        "eventId",
+        "sourceState",
+        "sourceCursor",
+        "scope",
+        "routes",
+        "responses"
+      ]
+    },
+    "WithdrawResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "sourceApplied": {
+          "type": "boolean"
+        },
+        "routes": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "routeRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "disposition": {
+                "type": "string",
+                "enum": [
+                  "prevented",
+                  "too_late",
+                  "pending",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "routeRef",
+              "disposition"
+            ]
+          }
+        }
+      },
+      "required": [
+        "operationId",
+        "eventId",
+        "sourceApplied",
+        "routes"
+      ]
+    },
+    "ScopeAdvance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "scopeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nextRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "active",
+            "paused",
+            "closed"
+          ]
+        }
+      },
+      "required": [
+        "operationId",
+        "scopeId",
+        "expectedRevision",
+        "nextRevision",
+        "state"
+      ]
+    },
+    "GateResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "defer",
+            "drop"
+          ]
+        },
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "CURRENT",
+            "BUSY",
+            "SOURCE_UNAVAILABLE",
+            "GUARD_UNAVAILABLE",
+            "STALE_REQUEST",
+            "CANCELLED",
+            "WRONG_OWNER",
+            "EXPIRED"
+          ]
+        },
+        "guardEpoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "decision",
+        "reasonCode",
+        "guardEpoch"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "allow"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "validUntil": true
+            },
+            "required": [
+              "validUntil"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "allow"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reasonCode": {
+                "const": "CURRENT"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "defer"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reasonCode": {
+                "enum": [
+                  "BUSY",
+                  "SOURCE_UNAVAILABLE",
+                  "GUARD_UNAVAILABLE"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "drop"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reasonCode": {
+                "enum": [
+                  "STALE_REQUEST",
+                  "CANCELLED",
+                  "WRONG_OWNER",
+                  "EXPIRED"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ResponseApplied": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "responseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "result": {
+          "$ref": "#/$defs/ApplicationResult"
+        }
+      },
+      "required": [
+        "operationId",
+        "responseId",
+        "result"
+      ]
+    },
+    "Request": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 2
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "op": {
+              "const": "source.managed.publish"
+            },
+            "params": {
+              "$ref": "#/$defs/ManagedPublish"
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "op",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 2
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "op": {
+              "const": "source.managed.receipt"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "eventId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                }
+              },
+              "required": [
+                "eventId"
+              ]
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "op",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 2
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "op": {
+              "const": "source.managed.watch"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "after": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 128
+                }
+              },
+              "required": [
+                "after",
+                "limit"
+              ]
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "op",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 2
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "op": {
+              "const": "source.managed.snapshot"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "afterEventId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 128
+                }
+              },
+              "required": [
+                "limit"
+              ]
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "op",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 2
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "op": {
+              "const": "source.event.withdraw"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "operationId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "eventId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "required": [
+                "operationId",
+                "eventId",
+                "reason"
+              ]
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "op",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 2
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "op": {
+              "const": "source.scope.advance"
+            },
+            "params": {
+              "$ref": "#/$defs/ScopeAdvance"
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "op",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 2
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "op": {
+              "const": "source.response.applied"
+            },
+            "params": {
+              "$ref": "#/$defs/ResponseApplied"
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "op",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 2
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "op": {
+              "const": "consumer.respond"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "operationId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "deliveryRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "responseType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "schemaVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "data": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "operationId",
+                "deliveryRef",
+                "responseType",
+                "schemaVersion",
+                "data"
+              ]
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "op",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protocol": {
+              "const": "pi-relay"
+            },
+            "major": {
+              "const": 1
+            },
+            "minor": {
+              "const": 2
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "op": {
+              "const": "owner.setup.commit"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "operationId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "planDigest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "consentReceiptRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                }
+              },
+              "required": [
+                "operationId",
+                "planDigest",
+                "consentReceiptRef"
+              ]
+            }
+          },
+          "required": [
+            "protocol",
+            "major",
+            "minor",
+            "requestId",
+            "op",
+            "params"
+          ]
+        }
+      ]
+    },
+    "SetupPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "channelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "consumerProfileId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "audienceIntent": {
+          "const": "single-current-owner"
+        },
+        "requestedMode": {
+          "enum": [
+            "display",
+            "resume"
+          ]
+        },
+        "grant": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxClaims": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "ttlMs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400000
+            },
+            "eventTypes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "maxItems": 64,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "maxClaims",
+            "ttlMs",
+            "eventTypes"
+          ]
+        }
+      },
+      "required": [
+        "sourceRef",
+        "channelId",
+        "consumerProfileId",
+        "audienceIntent",
+        "requestedMode",
+        "grant"
+      ]
+    }
+  }
+}
