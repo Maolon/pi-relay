@@ -26,15 +26,14 @@ export class Presentation {
   flush(): void {
     if (this.disposed || !this.dirty) return;
     this.dirty = false;
-    // Presence-only widget (owner 2026-09-21): the status line says just that
-    // the relay is attached to this session — 'relay: on'. Binding/hold/
-    // progress detail (provisioning, recovery, foreground holds) lives in
-    // /relay list and the relay_bindings tool; the widget never shouts it.
+    // Presence-only footer status: just 'relay: on', dimmed like the rest of
+    // the footer. Binding/hold/progress detail (provisioning, recovery,
+    // foreground holds) lives in /relay list and the relay_bindings tool.
     const attached = this.core.list().some(
       (b) => b.authority === 'valid' && b.state === 'active',
     );
     if (this.ctx.mode === 'tui')
-      this.ctx.ui.setWidget('pi-relay', attached ? ['relay: on'] : undefined);
+      this.ctx.ui.setStatus('pi-relay', attached ? this.ctx.ui.theme.fg('dim', 'relay: on') : undefined);
     const entries = this.ctx.sessionManager.getEntries();
     for (const binding of this.core.list()) {
       const unshown = this.core.store.all<{ id: string }>(
@@ -74,7 +73,7 @@ export class Presentation {
   dispose(): void {
     this.disposed = true;
     clearInterval(this.timer);
-    if (this.ctx.mode === 'tui') this.ctx.ui.setWidget('pi-relay', undefined);
+    if (this.ctx.mode === 'tui') this.ctx.ui.setStatus('pi-relay', undefined);
   }
 }
 export function registerPresentation(pi: ExtensionAPI): void {
