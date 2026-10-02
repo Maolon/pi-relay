@@ -14,7 +14,8 @@ Everything stays on one machine: a private state directory, Unix sockets and
 SQLite. No network, no daemon installed for you.
 
 > **Status: experimental (0.x).** Tested on macOS arm64 and Linux x64 with
-> Pi 0.85.1. APIs and on-disk formats may change between minor versions.
+> Pi 0.85.1 and Pi 1.0.0. APIs and on-disk formats may change between minor
+> versions.
 
 ## Install
 

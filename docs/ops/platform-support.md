@@ -1,6 +1,6 @@
 # Platform qualification
 
-Qualified targets are macOS arm64 (Node 26.5.0) and Linux x64 (Node 22.16.0) on a local filesystem, with Pi 0.85.1. Neither dependency installation nor the native gate alone certifies the complete application.
+Qualified targets are macOS arm64 (Node 26.5.0) and Linux x64 (Node 22.16.0) on a local filesystem, with Pi 0.85.1 and Pi 1.0.0. Neither dependency installation nor the native gate alone certifies the complete application.
 
 The real native gate passed on macOS arm64 / Node 26.5.0 and Linux x64 / Node 22.16.0. It exercises actual better-sqlite3 13.0.3 and fs-ext 2.1.1: exclusive locks, same-process duplicate ownership, contention while an owner is stopped, release after killing only a test-owned child, a fixed lock inode, SQLite WAL/FULL/foreign keys, rollback, busy refusal, reopen and disk-full refusal. The JSON report records precise runtime and dependency versions. It is not a physical power-loss durability test or a complete Pi lifecycle test.
 

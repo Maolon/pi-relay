@@ -147,7 +147,7 @@
     }
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-coding-agent": "^1.0.0",
     "@types/better-sqlite3": "7.6.13",
     "@types/fs-ext": "2.0.3",
     "@types/node": "22.15.30",
