@@ -1,6 +1,6 @@
 {
   "name": "@maolon/pi-relay",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Session mail and a durable local event relay for Pi: let Pi sessions message each other, and let external CLIs and extensions wake a session with events.",
   "keywords": [
     "pi-package",
@@ -147,7 +147,7 @@
     }
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-coding-agent": "^1.0.0",
     "@types/better-sqlite3": "7.6.13",
     "@types/fs-ext": "2.0.3",
     "@types/node": "22.15.30",
