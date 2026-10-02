@@ -89,9 +89,13 @@ export function createRelayExtension(options: RelayExtensionOptions = {}): Exten
         const { VERSION } = await import('@earendil-works/pi-coding-agent');
         // 下界检查而非精确钉死：精确钉会在每次 pi 升级时把 relay extension 打成 inert
         // （2026-09-21 实测：0.85.1 钉 × pi 0.86.1 → session_start 必抛 unsupported_version）。
+        // 1.x 是稳定 ABI 线：0.85+ 与一切 1.x 均受支持。
         // API 若真的破坏性变更，后续步骤会可见地报错，而不是静默 inert。
         const [vmaj, vmin] = VERSION.split('.').map(Number);
-        invariant(vmaj === 0 && vmin >= 85, 'unsupported_version');
+        invariant(
+          (vmaj === 0 && vmin >= 85) || vmaj >= 1,
+          'unsupported_version',
+        );
         const realm = options.realm ?? 'local',
           home = options.home ?? process.env.PI_RELAY_HOME ?? join(homedir(), '.pi', 'relay');
         const fingerprint = sessionFingerprint(
