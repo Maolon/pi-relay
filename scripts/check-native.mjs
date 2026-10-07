@@ -24,7 +24,7 @@ const report = {
   arch: process.arch,
   osRelease: release(),
   startedAt: new Date().toISOString(),
-  piBaseline: '0.85.1',
+  piBaseline: '1.0.0',
   piRuntimeTested: false,
   tests: results,
 };
