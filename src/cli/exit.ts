@@ -21,7 +21,8 @@ export function exitFor(result: FanoutResult | AdmissionResult | Record<string, 
   }
   const admission = result as Partial<AdmissionResult>;
   if (admission.outcome === 'admission-unknown') return 4;
-  if (admission.outcome === 'rejected') return 3;
+  // A retryable failure (e.g. full spool) is backpressure, not a policy rejection.
+  if (admission.outcome === 'rejected') return admission.error?.retryable ? 4 : 3;
   return 0;
 }
 

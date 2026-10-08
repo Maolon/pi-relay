@@ -98,6 +98,7 @@ export async function openSource(
 }
 export class BindingClient {
   private connection?: { rpc: RpcClient; hello: ConnectResult };
+  private opening?: Promise<{ rpc: RpcClient; hello: ConnectResult }>;
   private closed = false;
   constructor(
     readonly handle: BindingHandle,
@@ -107,12 +108,37 @@ export class BindingClient {
     validate('BindingHandle', handle);
   }
   private async conn() {
+    return this.open(['durable-events', 'receipt-query']);
+  }
+  /** One connection per client: overlapping callers share a single in-flight open,
+   *  and an open that finishes after reset()/dispose() is closed, never cached. */
+  private open(features: string[]): Promise<{ rpc: RpcClient; hello: ConnectResult }> {
     invariant(!this.closed, 'transport_unavailable');
-    return (this.connection ??= await openBinding(this.handle, ['durable-events', 'receipt-query']));
+    if (this.connection) return Promise.resolve(this.connection);
+    const opening: Promise<{ rpc: RpcClient; hello: ConnectResult }> = (this.opening ??= openBinding(
+      this.handle,
+      features,
+    ).then(
+      (connection) => {
+        if (this.closed || this.opening !== opening) {
+          connection.rpc.dispose();
+          throw new RelayError('transport_unavailable');
+        }
+        this.opening = undefined;
+        this.connection = connection;
+        return connection;
+      },
+      (error: unknown) => {
+        if (this.opening === opening) this.opening = undefined;
+        throw error;
+      },
+    ));
+    return opening;
   }
   private reset(): void {
     this.connection?.rpc.dispose();
     this.connection = undefined;
+    this.opening = undefined;
   }
   async publishPacket(packet: RoutePacket): Promise<AdmissionResult> {
     try {
@@ -175,6 +201,7 @@ export class BindingClient {
   ): Promise<{ outcome: 'accepted' | 'rejected' | 'unknown' | 'offline'; state?: string }> {
     try {
       const { rpc, hello } = await this.connManaged();
+      this.beforeSend?.();
       const result = (await rpc.call(
         {
           op: 'internal.target.admit',
@@ -268,13 +295,7 @@ export class BindingClient {
     }
   }
   private async connManaged() {
-    invariant(!this.closed, 'transport_unavailable');
-    return (this.connection ??= await openBinding(this.handle, [
-      'durable-events',
-      'receipt-query',
-      'consumer-gate-v1',
-      'consumer-responses-v1',
-    ]));
+    return this.open(['durable-events', 'receipt-query', 'consumer-gate-v1', 'consumer-responses-v1']);
   }
   /** Shared-channel wake-capable events must use SourcePublisher; the convenience edge is display-only. */
   async publish(value: Value): Promise<AdmissionResult> {

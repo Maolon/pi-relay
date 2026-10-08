@@ -178,6 +178,31 @@ it('6: at the hop limit mail is shown but does not start a turn', async () => {
   expect(got.message.content).toContain('Hop limit reached');
 });
 
+it('6b: a fresh send in a mail-started turn continues the hop count; a user turn resets it', async () => {
+  const a = session('aaaaaaaa-1111', 'alpha');
+  const b = session('bbbbbbbb-2222', 'beta');
+  await a.start();
+  await b.start();
+  // Ping-pong without replyTo: every send is a new thread, but the hop still climbs.
+  let last = JSON.parse(await a.call({ verb: 'send', to: 'beta', body: 'ping 0' }));
+  expect(last.hop).toBe(0);
+  const sides = [b, a];
+  for (let hop = 1; hop <= MAIL_MAX_HOPS; hop++) {
+    const receiver = sides[(hop - 1) % 2];
+    receiver.pump();
+    const peer = hop % 2 === 1 ? 'alpha' : 'beta';
+    last = JSON.parse(await receiver.call({ verb: 'send', to: peer, body: 'fresh ' + hop }));
+    expect(last.hop).toBe(hop);
+  }
+  const final = sides[MAIL_MAX_HOPS % 2];
+  final.pump();
+  expect(final.sent.at(-1).options.triggerTurn).toBe(false);
+  // The user speaking starts a new chain at hop 0.
+  final.entries.push({ type: 'message', message: { role: 'user', content: 'start over' } });
+  const fresh = JSON.parse(await final.call({ verb: 'send', to: final === a ? 'beta' : 'alpha', body: 'new' }));
+  expect(fresh.hop).toBe(0);
+});
+
 it('7: ambiguous and unknown recipients are refused without writing mail', async () => {
   const a = session('aaaaaaaa-1111', 'alpha');
   const b = session('bbbbbbbb-2222', 'twin');

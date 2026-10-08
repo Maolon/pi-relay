@@ -6,6 +6,7 @@ import { privateDir, readPrivate, syncDir } from '../platform/private-paths.js';
 import { assertPrivateFileStat } from '../platform/os-interop.js';
 import { canonical } from '../protocol/canonical.js';
 import { invariant, fail } from '../protocol/errors.js';
+export const OPERATIONS_RETAINED = 10000;
 const COMMON = `
 CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY,digest TEXT NOT NULL,result TEXT NOT NULL);
@@ -290,8 +291,21 @@ export class Store {
     return JSON.parse(row.result) as T;
   }
   saveOperation(id: string, requestDigest: string, result: unknown): void {
-    invariant((this.get<{ n: number }>('SELECT count(*) n FROM operations')?.n ?? 0) < 10000, 'backpressure');
     this.run('INSERT INTO operations VALUES(?,?,?)', id, requestDigest, canonical(result));
+    // Bounded idempotency window: keep the newest OPERATIONS_RETAINED results and
+    // drop the oldest, instead of refusing every later operation once full.
+    this.run(
+      'DELETE FROM operations WHERE rowid <= (SELECT max(rowid) FROM operations) - ?',
+      OPERATIONS_RETAINED,
+    );
+  }
+  /** Run fn and record its idempotent result in the same transaction. */
+  txOperation<T>(id: string, requestDigest: string, fn: () => T): T {
+    return this.tx(() => {
+      const result = fn();
+      this.saveOperation(id, requestDigest, result);
+      return result;
+    });
   }
   async backup(path: string): Promise<void> {
     invariant(!existsSync(path), 'id_conflict');

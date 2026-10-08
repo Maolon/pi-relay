@@ -421,11 +421,12 @@ export class TargetCore {
     invariant(revision === b.revision, 'stale_binding_revision');
     return b;
   }
-  append(id: string, event: string, kind: string, body: unknown): number {
+  append(id: string, event: string, kind: string, body: unknown, control = false): number {
     const seq =
       (this.store.get<{ n: number }>('SELECT coalesce(max(seq),0) n FROM receipts WHERE binding=?', id)?.n ??
         0) + 1;
-    invariant(seq <= LIMITS.receiptsPerBinding, 'backpressure');
+    // Owner controls (revoke, disarm, ...) must stay possible on a full binding.
+    invariant(control || seq <= LIMITS.receiptsPerBinding, 'backpressure');
     this.store.run(
       'INSERT INTO receipts VALUES(?,?,?,?,?,?)',
       id,
@@ -745,7 +746,7 @@ export class TargetCore {
       const cut = this.append(id, 'control', command.action, {
         revision: b.revision,
         operationId: command.operationId,
-      });
+      }, true);
       const receipt = { bindingId: id, revision: b.revision, controlCut: cut, prevented, tooLate, unknown };
       this.store.saveOperation(command.operationId, requestDigest, receipt);
       return receipt;

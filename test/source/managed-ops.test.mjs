@@ -382,6 +382,23 @@ it('[stage 3.5] withdraw while staged drops the pending push (03 §3.2)', async 
   void id;
 });
 
+it('[stage 3.5] a binding revoked while its packet is staged never receives it on retry', async () => {
+  f = await system({ targets: 1 });
+  const id = await f.bind(0);
+  const { audienceRef, scopeId, scopeRevision } = await setupAudience(f.source);
+  await f.target[0].close();
+  await publishOffline(f.source, 'md-offline-r', audienceRef, scopeId, scopeRevision);
+  expect(f.source.core.store.all('SELECT * FROM managed_route_pending')).toHaveLength(1);
+  // Revoke lands while the target is offline, so the target itself never hears of it.
+  f.source.core.store.run("UPDATE memberships SET state='revoked' WHERE binding=?", id);
+  f.target[0] = await createTarget({ home: f.home, realm: 'test', fingerprint: sha256('target-0') });
+  await eventually(() => !f.source.core.store.get('SELECT 1 FROM managed_route_pending'));
+  expect(
+    f.target[0].core.store.get("SELECT 1 FROM managed_deliveries WHERE event_id='md-offline-r'"),
+  ).toBeUndefined();
+  expect(f.source.managed.managedReceipt(OWNER, 'md-offline-r').routes[0].admission).toBe('rejected');
+});
+
 it('[stage 3.5] offline retries back off exponentially and stay due-gated', async () => {
   f = await system({ targets: 1 });
   const id = await f.bind(0);
