@@ -11,7 +11,7 @@ import type {
 import { RpcClient } from '../transport/client.js';
 import { openSource } from './index.js';
 import { MANAGED_SOURCE_FEATURES } from '../protocol/validate.js';
-import { invariant } from '../protocol/errors.js';
+import { invariant, RelayError } from '../protocol/errors.js';
 
 /**
  * Managed delivery source SDK (approved plan 02 §2.2).
@@ -24,13 +24,43 @@ export class ManagedSourceClient {
     readonly handle: SourceHandle,
     private connection?: { rpc: RpcClient },
   ) {}
-  private async conn(): Promise<{ rpc: RpcClient }> {
+  private opening?: Promise<{ rpc: RpcClient }>;
+  private conn(): Promise<{ rpc: RpcClient }> {
     invariant(!this.closed, 'transport_unavailable');
-    return (this.connection ??= await openSource(this.handle, [...MANAGED_SOURCE_FEATURES]));
+    if (this.connection) return Promise.resolve(this.connection);
+    const opening: Promise<{ rpc: RpcClient }> = (this.opening ??= openSource(this.handle, [
+      ...MANAGED_SOURCE_FEATURES,
+    ]).then(
+      (connection) => {
+        if (this.closed || this.opening !== opening) {
+          connection.rpc.dispose();
+          throw new RelayError('transport_unavailable');
+        }
+        this.opening = undefined;
+        this.connection = connection;
+        return connection;
+      },
+      (error: unknown) => {
+        if (this.opening === opening) this.opening = undefined;
+        throw error;
+      },
+    ));
+    return opening;
   }
   private async call(op: string, params: unknown): Promise<unknown> {
-    const { rpc } = await this.conn();
-    return rpc.call({ op, params } as never, 2);
+    const connection = await this.conn();
+    try {
+      return await connection.rpc.call({ op, params } as never, 2);
+    } catch (error) {
+      // A dead socket must not stay cached: the next call reconnects.
+      if (error instanceof RelayError && ['transport_unavailable', 'admission_unknown'].includes(error.code)) {
+        if (this.connection === connection) {
+          connection.rpc.dispose();
+          this.connection = undefined;
+        }
+      }
+      throw error;
+    }
   }
   async publishManaged(
     event: ManagedEvent,
@@ -91,6 +121,7 @@ export class ManagedSourceClient {
   }
   dispose(): void {
     this.closed = true;
+    this.opening = undefined;
     this.connection?.rpc.dispose();
     this.connection = undefined;
   }

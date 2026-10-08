@@ -36,8 +36,10 @@ owner surface is `/relay mail peers` and `/relay mail send TO TEXT`.
 The recipient's extension watches its inbox and injects each mail as a
 `pi-relay.mail.v1` message (`deliverAs: followUp`), which starts a turn when
 the session is idle. Mail is labelled as coming from another session, not
-the user. Each reply increments `hop`; from hop 6 on a mail is still shown
-but no longer starts a turn, so two sessions cannot wake each other forever.
+the user. Each reply increments `hop`, and so does a fresh send (no
+`replyTo`) made in a turn that mail started; only a user message resets the
+count to 0. From hop 6 on a mail is still shown but no longer starts a turn,
+so two sessions cannot wake each other forever.
 
 Mail to a session that is not running is refused (`not_found`); mail already
 queued when a session exits waits for that session id to resume. Known
