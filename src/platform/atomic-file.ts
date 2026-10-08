@@ -79,7 +79,14 @@ export function removeIfSame(path: string, identity: { ino: number; dev: number 
 export function directoryBytes(path: string): number {
   verifyDir(path);
   return readdirSync(path).reduce((sum, name) => {
-    const st = lstatSync(join(path, name));
+    let st;
+    try {
+      st = lstatSync(join(path, name));
+    } catch (e) {
+      // Concurrently imported by the target between readdir and lstat.
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return sum;
+      throw e;
+    }
     invariant(st.isFile() && !st.isSymbolicLink(), 'unsafe_path');
     return sum + st.size;
   }, 0);

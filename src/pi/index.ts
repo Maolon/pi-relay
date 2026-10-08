@@ -200,6 +200,8 @@ export function createRelayExtension(options: RelayExtensionOptions = {}): Exten
         options.onAttached?.(host, port);
         changed();
       } catch (error) {
+        // A newer session_start already took over: its host is not ours to dispose.
+        if (current !== generation) return;
         const detail = safeError(error);
         if (detail.code === 'owner_conflict') {
           // Actionable takeover timeout: name the incumbent process.

@@ -120,7 +120,7 @@ export class ManagedSource {
     const requestDigest = digest({ op: 'source.scope.advance', publisherId, params });
     const prior = this.store.operation<{ revision: number; state: string }>(params.operationId, requestDigest);
     if (prior) return prior;
-    const result = this.store.tx(() => {
+    const result = this.store.txOperation(params.operationId, requestDigest, () => {
       const row = this.store.get<ScopeRow>(
         'SELECT * FROM managed_scopes WHERE publisher_id=? AND scope_id=?',
         publisherId,
@@ -150,7 +150,6 @@ export class ManagedSource {
       );
       return { revision: params.nextRevision, state: params.state };
     });
-    this.store.saveOperation(params.operationId, requestDigest, result);
     return result;
   }
 
@@ -489,7 +488,15 @@ export class ManagedSource {
       let client: BindingClient | undefined;
       try {
         const handle = this.routeHandle(packet.bindingId);
-        client = new BindingClient(handle);
+        // Same membership gate as the first push: a binding revoked while the
+        // packet was staged must not receive it on retry.
+        client = new BindingClient(handle, undefined, () => {
+          invariant(
+            this.store.get<{ state: string }>('SELECT state FROM memberships WHERE binding=?', packet.bindingId)
+              ?.state === 'active',
+            'binding_revoked',
+          );
+        });
         const result = await client.publishManagedPacket(packet);
         if (result.outcome === 'accepted') {
           this.recordRouteAdmission(packet, result);
@@ -818,7 +825,7 @@ export class ManagedSource {
     const requestDigest = digest({ op: 'source.event.withdraw', publisherId, input });
     const prior = this.store.operation<WithdrawResult>(input.operationId, requestDigest);
     if (prior) return prior;
-    const result = this.store.tx<WithdrawResult>(() => {
+    const result = this.store.txOperation<WithdrawResult>(input.operationId, requestDigest, () => {
       const now = this.core.clock.now();
       this.store.run(
         'INSERT OR IGNORE INTO event_tombstones VALUES(?,?,?,?,?)',
@@ -867,7 +874,6 @@ export class ManagedSource {
         routes,
       };
     });
-    this.store.saveOperation(input.operationId, requestDigest, result);
     return result;
   }
 
@@ -879,7 +885,7 @@ export class ManagedSource {
     const requestDigest = digest({ op: 'source.response.applied', publisherId, params });
     const prior = this.store.operation<{ applied: boolean }>(params.operationId, requestDigest);
     if (prior) return prior;
-    const result = this.store.tx(() => {
+    const result = this.store.txOperation(params.operationId, requestDigest, () => {
       const row = this.store.get<SourceResponseRow>(
         'SELECT * FROM source_responses WHERE response_id=?',
         params.responseId,
@@ -902,7 +908,6 @@ export class ManagedSource {
       }
       return { applied: true };
     });
-    this.store.saveOperation(params.operationId, requestDigest, result);
     return result;
   }
 

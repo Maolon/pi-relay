@@ -204,8 +204,13 @@ export class Mailbox {
     );
   }
 
-  /** Queue a mail in the recipient's inbox. `origin` is the mail being replied to. */
-  send(input: { to?: string; body: string; replyTo?: string }, origin?: MailOrigin): { mail: Mail; recipient: MailPeer } {
+  /** Queue a mail in the recipient's inbox. `origin` is the mail being replied to;
+   *  `causedBy` is the mail that started the current turn (new thread, hop continues). */
+  send(
+    input: { to?: string; body: string; replyTo?: string },
+    origin?: MailOrigin,
+    causedBy?: MailOrigin,
+  ): { mail: Mail; recipient: MailPeer } {
     if (typeof input.body !== 'string' || !input.body.trim())
       throw new MailError('invalid_payload', 'body is required');
     if (Buffer.byteLength(input.body) > MAIL_MAX_BODY_BYTES)
@@ -224,7 +229,7 @@ export class Mailbox {
       body: input.body,
       ...(input.replyTo ? { replyTo: input.replyTo } : {}),
       threadId: origin?.threadId ?? id,
-      hop: origin ? origin.hop + 1 : 0,
+      hop: origin ? origin.hop + 1 : causedBy ? causedBy.hop + 1 : 0,
       sentAt: new Date().toISOString(),
     };
     const inbox = privateDir(join(this.root, 'inbox', recipient.sessionId));

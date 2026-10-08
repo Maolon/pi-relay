@@ -38,6 +38,25 @@ function deliveredMail(ctx: ExtensionContext): Map<string, MailOrigin> {
   return result;
 }
 
+/** The newest mail delivered since the user last spoke: a fresh send made in a
+ *  mail-started turn continues that chain's hop count instead of resetting it,
+ *  so omitting replyTo cannot bypass the hop limit. */
+function mailSinceUser(ctx: ExtensionContext): MailOrigin | undefined {
+  let latest: MailOrigin | undefined;
+  for (const entry of ctx.sessionManager.getEntries() as Array<{
+    type?: string;
+    details?: unknown;
+    message?: { role?: string };
+  }>) {
+    if (entry.type === 'message' && entry.message?.role === 'user') latest = undefined;
+    if (entry.type !== 'custom_message') continue;
+    const d = entry.details as Partial<MailDetails> | undefined;
+    if (d?.namespace !== MAIL_NAMESPACE || typeof d.mailId !== 'string' || !d.from || !d.threadId) continue;
+    latest = { threadId: d.threadId, hop: Number(d.hop ?? 0), from: d.from };
+  }
+  return latest;
+}
+
 export function mailContent(mail: Mail): string {
   const limited = mail.hop >= MAIL_MAX_HOPS;
   return [
@@ -134,7 +153,7 @@ export class SessionMail {
   send(input: { to?: string; body: string; replyTo?: string }) {
     this.refreshName();
     const origin = input.replyTo ? deliveredMail(this.ctx).get(input.replyTo) : undefined;
-    const { mail, recipient } = this.box.send(input, origin);
+    const { mail, recipient } = this.box.send(input, origin, origin ? undefined : mailSinceUser(this.ctx));
     return {
       id: mail.id,
       to: { name: peerLabel(recipient), sessionId: recipient.sessionId },
