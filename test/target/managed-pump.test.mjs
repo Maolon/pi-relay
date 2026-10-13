@@ -104,9 +104,8 @@ it('[02 §2.5/03 §3.3] full trajectory: admit -> gate allow -> intent -> submit
   let invoked = 0;
   // Owner authority: managed resume consumes an armed grant (01 §1.3 / 03 §3.7).
   f.arm(0, id);
-  const pump = await managed.pumpManaged(idle, async () => {
+  const pump = await managed.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   expect(pump.claimed).toBe(1);
   expect(invoked).toBe(1);
@@ -117,8 +116,12 @@ it('[02 §2.5/03 §3.3] full trajectory: admit -> gate allow -> intent -> submit
     'SELECT * FROM managed_deliveries',
   );
   expect(deliveries).toHaveLength(1);
-  expect(deliveries[0].state).toBe('recorded');
-  expect(deliveries[0].target_revision).toBeGreaterThanOrEqual(4);
+  expect(deliveries[0].state).toBe('submitted');
+  // The facade's observation seam is separate from the successful handoff.
+  expect(managed.observeSubmitted(deliveries[0].delivery_ref, 'file-entry')).toBe(true);
+  const recorded = target.core.store.get('SELECT state, target_revision FROM managed_deliveries');
+  expect(recorded.state).toBe('recorded');
+  expect(recorded.target_revision).toBeGreaterThanOrEqual(4);
 
   // consumer respond (02 §2.5): durable target-side outbox + receipt fact
   const response = managed.respond({
@@ -180,9 +183,8 @@ it('[02 §2.5] gate defer holds the delivery; gate drop suppresses without claim
     async () => ({ decision: 'defer', reasonCode: 'BUSY', guardEpoch: 1 }),
   );
   let invoked = 0;
-  await managed.pumpManaged(idle, async () => {
+  await managed.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   expect(invoked).toBe(0);
   const deferred = target.core.store.all('SELECT * FROM managed_deliveries');
@@ -201,9 +203,8 @@ it('[02 §2.5] gate defer holds the delivery; gate drop suppresses without claim
     },
     async () => ({ decision: 'drop', reasonCode: 'STALE_REQUEST', guardEpoch: 1 }),
   );
-  await managed2.pumpManaged(idle, async () => {
+  await managed2.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   const dropped = target.core.store
     .all('SELECT * FROM managed_deliveries')
@@ -243,12 +244,13 @@ it('[03 §3.4] control cuts: prevented before invoke, too_late after recorded', 
       .state,
   ).toBe('withdrawn');
 
-  // record md-cut-late via the pump (withdrawn delivery is skipped)
+  // Submit then observe md-cut-late (withdrawn delivery is skipped).
   f.arm(0, id);
-  await managed.pumpManaged(idle, async () => ({ evidence: 'file-entry' }));
+  await managed.pumpManaged(() => idle, () => {});
   const rows = target.core.store.all('SELECT * FROM managed_deliveries');
   const late = rows.find((r) => r.event_id === 'md-cut-late');
-  expect(late.state).toBe('recorded');
+  expect(late.state).toBe('submitted');
+  expect(managed.observeSubmitted(late.delivery_ref, 'file-entry')).toBe(true);
 
   const lateCut = managed.applyControl({
     kind: 'event-withdraw',
@@ -275,23 +277,21 @@ it('[01 §1.3/03 §3.7] managed resume requires an owner-armed grant; guard defe
     allowGate(),
   );
   let invoked = 0;
-  await target.managed.pumpManaged(idle, async () => {
+  await target.managed.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   expect(invoked).toBe(0);
   expect(
     target.core.store.get('SELECT state FROM managed_deliveries WHERE event_id=?', 'md-nogrant').state,
   ).toBe('pending');
   f.arm(0, id);
-  await target.managed.pumpManaged(idle, async () => {
+  await target.managed.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   expect(invoked).toBe(1);
   expect(
     target.core.store.get('SELECT state FROM managed_deliveries WHERE event_id=?', 'md-nogrant').state,
-  ).toBe('recorded');
+  ).toBe('submitted');
   void id;
 });
 
@@ -316,9 +316,8 @@ it('[03 §3.3 step4 / I17] control landing mid-guard is not overridden by a late
     () => gate,
   );
   let invoked = 0;
-  const pumping = target.managed.pumpManaged(idle, async () => {
+  const pumping = target.managed.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   // While the guard is in flight, the withdraw control lands and cuts the delivery.
   const cut = target.managed.applyControl({
@@ -423,10 +422,9 @@ it('[03 §3.3 step2] healthy scope proof lets the trajectory proceed; guard sees
   );
   let invoked = 0;
   await target.managed.pumpManaged(
-    idle,
+    () => idle,
     async () => {
       invoked++;
-      return { evidence: 'file-entry' };
     },
     proofFor('md-proof-ok'),
   );
@@ -462,10 +460,9 @@ it('[03 §3.3 step2] tombstoned / fenced-in-scope proofs withdraw without invoke
   let invoked = 0;
   const pump = async (proof) =>
     target.managed.pumpManaged(
-      idle,
+      () => idle,
       async () => {
         invoked++;
-        return { evidence: 'file-entry' };
       },
       proof,
     );
@@ -499,10 +496,9 @@ it('[03 §3.3 step2] unconfirmable scope defers requireCurrentScope deliveries (
   );
   let invoked = 0;
   await target.managed.pumpManaged(
-    idle,
+    () => idle,
     async () => {
       invoked++;
-      return { evidence: 'file-entry' };
     },
     async () => undefined, // source unreachable within the proof window
   );
@@ -567,9 +563,8 @@ it('[03 §3.6] intent-then-crash restores to unknown and is never auto-retried',
   };
   let invoked = 0;
   await expect(
-    target.managed.pumpManaged(idle, async () => {
+    target.managed.pumpManaged(() => idle, async () => {
       invoked++;
-      return { evidence: 'file-entry' };
     }),
   ).rejects.toThrow(/SIGKILL/);
   expect(invoked).toBe(0);
@@ -583,9 +578,8 @@ it('[03 §3.6] intent-then-crash restores to unknown and is never auto-retried',
     target.core.store.get('SELECT state FROM managed_deliveries WHERE event_id=?', 'md-crash').state,
   ).toBe('unknown');
   // unknown is never claimed again by the pump.
-  await target.managed.pumpManaged(idle, async () => {
+  await target.managed.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   expect(invoked).toBe(0);
   void id;
@@ -617,9 +611,8 @@ it('[03 §3.6] event expiry during retry ends auto-resume with state expired', a
     allowGate(),
   );
   let invoked = 0;
-  await target.managed.pumpManaged(idle, async () => {
+  await target.managed.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   expect(invoked).toBe(0);
   expect(
@@ -647,7 +640,7 @@ it('[03 §3.3 step2] host-managedScopeProof walks the real Target→Source trans
   void id;
 });
 
-it('[stage 4] declaration-registered consumer: pump records; revoke defers with no invoke and no budget', async () => {
+it('[stage 4] declaration-registered consumer: pump submits; revoke defers with no invoke and no budget', async () => {
   f = await system({ targets: 1 });
   const id = await f.bind(0);
   const target = f.target[0];
@@ -672,9 +665,8 @@ it('[stage 4] declaration-registered consumer: pump records; revoke defers with 
 
   f.arm(0, id);
   let invoked = 0;
-  const pump = await managed.pumpManaged(idle, async () => {
+  const pump = await managed.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   expect(pump.claimed).toBe(1);
   expect(invoked).toBe(1);
@@ -683,7 +675,7 @@ it('[stage 4] declaration-registered consumer: pump records; revoke defers with 
   expect(deliveries[0]).toMatchObject({
     eventId: 'md-decl-1',
     eventType: 'process.exited.v1',
-    state: 'recorded',
+    state: 'submitted',
     consumerProfileId: 'watcher-profile',
   });
 
@@ -694,9 +686,8 @@ it('[stage 4] declaration-registered consumer: pump records; revoke defers with 
   expect(managed.listConsumers()).toHaveLength(0);
   f.arm(0, id);
   let invoked2 = 0;
-  const pump2 = await managed.pumpManaged(idle, async () => {
+  const pump2 = await managed.pumpManaged(() => idle, async () => {
     invoked2++;
-    return { evidence: 'file-entry' };
   });
   expect(pump2.claimed).toBe(1); // claimed, then deferred by the missing guard
   expect(invoked2).toBe(0);

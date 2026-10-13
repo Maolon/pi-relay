@@ -103,10 +103,10 @@ async function ackTailFixture() {
     action: 'arm',
     grant: { eventTypes: ['process.exited.v1'], maxClaims: 2, ttlMs: 600000 },
   });
-  const pump = await target.managed.pumpManaged(idle, async () => ({ evidence: 'file-entry' }));
+  const pump = await target.managed.pumpManaged(() => idle, () => {});
   expect(pump.claimed).toBe(1);
   const delivery = target.managed.managedDeliveries()[0];
-  expect(delivery.state).toBe('recorded');
+  expect(delivery.state).toBe('submitted');
   const respond = target.managed.respond({
     operationId: newId('op'),
     deliveryRef: delivery.deliveryRef,
