@@ -463,21 +463,23 @@ export class ManagedTarget {
    *  before the guard; Source unavailable defers deliveries whose registration
    *  requires a confirmable current scope. */
   async pumpManaged(
-    eligibility: Eligibility,
-    invoke: (packet: { event: ManagedRoutePacket['event']; options: ManagedRoutePacket['options'] }, deliveryRef: string) => Promise<{ evidence: 'runtime-entry' | 'file-entry'; observation?: unknown } | undefined>,
+    getEligibility: () => Eligibility,
+    invoke: (packet: { event: ManagedRoutePacket['event']; options: ManagedRoutePacket['options'] }, deliveryRef: string) => void | Promise<void>,
     proof?: (bindingId: string, eventIds: string[]) => Promise<ScopeProof | undefined>,
   ): Promise<{ claimed: number; deferred: boolean }> {
-    if (
-      !this.core.ready ||
-      !eligibility.idle ||
-      eligibility.pending ||
-      eligibility.knownWait ||
-      eligibility.strictNoAutoResume
-    )
-      return { claimed: 0, deferred: false };
+    const eligible = () => {
+      const eligibility = getEligibility();
+      return this.core.ready && eligibility.idle && !eligibility.pending &&
+        !eligibility.knownWait && !eligibility.strictNoAutoResume;
+    };
+    if (!eligible()) return { claimed: 0, deferred: false };
     let claimed = 0;
     let deferred = false;
     for (;;) {
+      if (!eligible()) {
+        deferred = true;
+        break;
+      }
       const delivery = this.claimNextManaged();
       if (!delivery) break;
       claimed++;
@@ -492,11 +494,18 @@ export class ManagedTarget {
       );
       if (proof) {
         const fetched = await proof(this.bindingOf(delivery), [delivery.event_id]);
+        if (!eligible()) {
+          deferred = true;
+          break;
+        }
         const fresh =
           fetched && fetched.issuedAt + fetched.validForMs > this.core.clock.now();
         if (!fresh) {
           // Source not confirmable within the proof window (02 §2.5).
-          if (registration?.require_current_scope) break;
+          if (registration?.require_current_scope) {
+            deferred = true;
+            break;
+          }
         } else {
           const entry = fetched.proofs.find((p) => p.eventId === delivery.event_id);
           if (entry) {
@@ -522,6 +531,10 @@ export class ManagedTarget {
       }
       // Consumer gate (02 §2.5): registered guard decides per delivery.
       const gate = await this.runGuard(delivery, request);
+      if (!eligible()) {
+        deferred = true;
+        break;
+      }
       if (gate.decision === 'defer') {
         deferred = true;
         break; // BUSY/GUARD_UNAVAILABLE: stop this pass, delivery stays pending, no claim consumed
@@ -536,19 +549,14 @@ export class ManagedTarget {
       // no budget is consumed. No await between this transition and the invoke boundary.
       if (!this.advanceToIntent(delivery)) break;
       this.core.options.fault?.('managed.after_intent_commit');
-      let outcome: Awaited<ReturnType<typeof invoke>>;
       try {
-        outcome = await invoke(request, delivery.delivery_ref);
+        await invoke(request, delivery.delivery_ref);
       } catch {
         this.setState(delivery.delivery_ref, 'unknown');
         continue;
       }
-      if (!outcome) {
-        this.setState(delivery.delivery_ref, 'unknown');
-        continue;
-      }
+      // A successful handoff is not observation: only a real session entry records it.
       this.setState(delivery.delivery_ref, 'submitted');
-      this.observeManaged(delivery.delivery_ref, outcome.evidence, outcome.observation);
     }
     return { claimed, deferred };
   }
