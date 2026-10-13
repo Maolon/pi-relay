@@ -86,12 +86,12 @@ export class PiSessionPort {
   private observeManagedEntry(entry: unknown): void {
     const m = this.managed;
     if (!m || !entry || typeof entry !== 'object') return;
-    const e = entry as { type?: string; details?: Record<string, unknown> };
-    if (e.type !== 'custom_message') return;
+    const e = entry as { type?: string; customType?: string; id?: string; details?: Record<string, unknown> };
+    if (e.type !== 'custom_message' || e.customType !== 'pi-relay.managed.delivery.v1' || typeof e.id !== 'string') return;
     const details = e.details ?? {};
     if (details.namespace !== 'pi-relay/managed/delivery/v1') return;
-    const deliveryRef = String(details.deliveryRef ?? '');
-    if (!deliveryRef) return;
+    const deliveryRef = details.deliveryRef;
+    if (typeof deliveryRef !== 'string' || !deliveryRef) return;
     try {
       m.target.observeSubmitted(deliveryRef, 'runtime-entry');
     } catch {
@@ -156,8 +156,8 @@ export class PiSessionPort {
       if (this.managed && !this.disposed) {
         try {
           const pumped = await this.managed.target.pumpManaged(
-            this.eligibility(),
-            async (request, deliveryRef) => {
+            () => this.eligibility(),
+            (request, deliveryRef) => {
               this.pi.sendMessage(
                 {
                   customType: 'pi-relay.managed.delivery.v1',
@@ -167,7 +167,6 @@ export class PiSessionPort {
                 },
                 { triggerTurn: true, deliverAs: 'followUp' },
               );
-              return { evidence: 'runtime-entry' };
             },
             this.managed.proof,
           );

@@ -56,12 +56,12 @@ function arm(id) {
   control(id, 'arm', { grant: { eventTypes: ['process.exited.v1'], maxClaims: 1, ttlMs: 600000 } });
 }
 it('[L01 L03 L22 L23 G25] real Pi records one authorized idle resume; fire-and-forget is not its receipt', async () => {
-  let beforeStart = 0;
+  const beforeStart = [];
   await setup({
     extraExtensions: [
       (api) =>
-        api.on('before_agent_start', () => {
-          beforeStart++;
+        api.on('before_agent_start', (event) => {
+          beforeStart.push(event);
         }),
     ],
   });
@@ -73,7 +73,12 @@ it('[L01 L03 L22 L23 G25] real Pi records one authorized idle resume; fire-and-f
   await source.core.publish('X', event('resume'));
   await new Promise((r) => setTimeout(r, 150));
   expect(provider.requests).toHaveLength(1);
-  expect(beforeStart).toBe(0);
+  expect(beforeStart).toHaveLength(1);
+  expect(beforeStart[0]).toMatchObject({
+    messageType: 'custom',
+    message: { customType: 'pi-relay.delivery.v1' },
+  });
+  expect(beforeStart[0]).not.toHaveProperty('prompt');
   expect(pi.errors).toEqual([]);
   const request = JSON.stringify(provider.requests[0]);
   expect(request).toContain('event=resume');

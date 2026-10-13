@@ -170,14 +170,13 @@ it('[respond] wake → respond(received) → outbox carries the watcher HostAck 
   await provisioned();
   await publishAttention('ep-1', 'evt-respond-1');
   let invoked = 0;
-  const pump = await target.managed.pumpManaged(idle, async () => {
+  const pump = await target.managed.pumpManaged(() => idle, async () => {
     invoked++;
-    return { evidence: 'file-entry' };
   });
   expect(pump.claimed).toBe(1);
   expect(invoked).toBe(1);
   const delivery = target.managed.managedDeliveries()[0];
-  expect(delivery.state).toBe('recorded');
+  expect(delivery.state).toBe('submitted');
 
   const result = performRespond(target.managed, declHome, {
     deliveryRef: delivery.deliveryRef,
