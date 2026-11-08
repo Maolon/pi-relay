@@ -42,6 +42,13 @@ The model calls `relay_mail`, and the `web` session receives:
 Mail works without any setup. Loops are bounded: after six hops a reply is
 still shown but no longer starts a turn. Set `PI_RELAY_MAIL=0` to turn it off.
 
+The mailbox also implements the AP Browser Connect receiver protocol. While the
+session is active it publishes and renews `.ap-browser/receiver.json`; browser
+mail must match the current session and receiver epoch and arrive before its
+deadline. Explicit `accepted`, `rejected`, or `expired` receipts are written
+under `.ap-browser/receipts/`. A receiver restart rotates the epoch, so rebind an
+existing AP Browser session after restarting or resuming it in a new process.
+
 ## Event relay in 60 seconds
 
 ```sh
