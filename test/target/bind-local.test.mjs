@@ -161,3 +161,83 @@ it('[delta-2] standing grant claims survive beyond the nominal claim cap', async
   const after = t[0].core.store.get('SELECT consumed FROM grants WHERE id=?', grantRow.id);
   expect(after.consumed).toBe(1000); // incremented past the nominal cap without rejection
 }, 10000);
+
+// Regression: a standing binding has no invite, so the Target→Source scope
+// proof used to be unreachable and a withdrawn / scope-closed managed event
+// still woke the session. The standing principal now fetches the proof.
+async function standingManaged(eventId) {
+  const { source, targets: t } = await env();
+  const { bindingId } = await t[0].bindLocal({ sourceId: 'watcher-local', channelId: 'W' });
+  const OWNER = { kind: 'owner' };
+  source.managed.provisionAudience(OWNER, {
+    audienceRef: 'aud-standing',
+    channelId: 'W',
+    consumerProfileId: 'watcher-profile',
+    requestedMode: 'resume',
+    validUntilMs: 3_600_000,
+  });
+  source.managed.advanceScope(OWNER, {
+    operationId: newId('op'), scopeId: 'scope-s', expectedRevision: 0, nextRevision: 1, state: 'active',
+  });
+  const now = Date.now();
+  await source.managed.publishManaged(OWNER, {
+    event: {
+      kind: 'event', id: eventId, type: 'process.exited.v1', schemaVersion: 1,
+      occurredAt: new Date(now).toISOString(), validUntil: new Date(now + 120_000).toISOString(),
+      data: { exitCode: 0 },
+    },
+    options: {
+      audienceRef: 'aud-standing', scope: { id: 'scope-s', revision: 1 },
+      consumerProfileId: 'watcher-profile', requestedMode: 'resume',
+    },
+  });
+  t[0].managed.registerConsumer(
+    {
+      profileId: 'watcher-profile', eventManifestDigest: 'd1', responseManifestDigest: 'd2',
+      guardImplementationId: 'g1', timeoutMs: 1000, requireCurrentScope: false,
+    },
+    async () => ({
+      decision: 'allow', reasonCode: 'CURRENT', guardEpoch: 1,
+      validUntil: new Date(Date.now() + 30_000).toISOString(),
+    }),
+  );
+  const idle = { idle: true, pending: false, knownWait: false, strictNoAutoResume: false };
+  let invoked = 0;
+  const pump = () =>
+    t[0].managed.pumpManaged(() => idle, async () => { invoked++; }, (b, ids) => t[0].managedScopeProof(b, ids));
+  const state = () =>
+    t[0].core.store.get('SELECT state FROM managed_deliveries WHERE event_id=?', eventId)?.state;
+  return { source, target: t[0], bindingId, OWNER, pump, state, invoked: () => invoked };
+}
+
+it('[delta-2] standing binding fetches the scope proof over the local principal', async () => {
+  const s = await standingManaged('md-standing-proof');
+  const proof = await s.target.managedScopeProof(s.bindingId, ['md-standing-proof']);
+  expect(proof?.proofs).toHaveLength(1);
+  expect(proof.proofs[0]).toMatchObject({ scopeState: 'active', tombstoned: false, audienceState: 'open' });
+}, 10000);
+
+it('[delta-2] withdrawn event on a standing binding is cut at claim: no invoke', async () => {
+  const s = await standingManaged('md-standing-wd');
+  expect(s.state()).toBe('pending');
+  s.source.managed.withdraw(s.OWNER, { operationId: newId('wd'), eventId: 'md-standing-wd', reason: 'watch close' });
+  await s.pump();
+  expect(s.invoked()).toBe(0);
+  expect(s.state()).toBe('withdrawn');
+}, 10000);
+
+it('[delta-2] closed scope on a standing binding is cut at claim: no invoke', async () => {
+  const s = await standingManaged('md-standing-closed');
+  s.source.managed.advanceScope(s.OWNER, {
+    operationId: newId('op'), scopeId: 'scope-s', expectedRevision: 1, nextRevision: 2, state: 'closed',
+  });
+  await s.pump();
+  expect(s.invoked()).toBe(0);
+  expect(s.state()).toBe('withdrawn');
+}, 10000);
+
+it('[delta-2] live event on a standing binding still wakes once', async () => {
+  const s = await standingManaged('md-standing-live');
+  await s.pump();
+  expect(s.invoked()).toBe(1);
+}, 10000);

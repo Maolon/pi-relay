@@ -13,7 +13,7 @@ import { newId, sha256 } from '../protocol/canonical.js';
 import { privateDir, privateJson } from '../platform/private-paths.js';
 import { installPrivate, replaceDiscovery, removeIfSame } from '../platform/atomic-file.js';
 import { serve, type RequestHandler } from '../transport/server.js';
-import { enroll, enrollLocal, openSource } from '../client/index.js';
+import { enroll, enrollLocal, openSource, openSourceLocal } from '../client/index.js';
 import { readSourceChannel } from '../platform/source-read.js';
 import { STANDING_EXPIRES_AT, STANDING_INVITE_ID } from '../protocol/constants.js';
 import { OwnerLock, readOwnerToken } from '../platform/owner-lock.js';
@@ -160,7 +160,7 @@ export class TargetHost {
     }
   }
   /** Scope-proof fetch (03 §3.3 step 2): Target→Source over the binding's stored
-   *  invite, ≤1s window, undefined on any failure (callers defer). Connections
+   *  invite (or the local standing principal), ≤1s window, undefined on any failure (callers defer). Connections
    *  are cached per binding and disposed on close. */
   async managedScopeProof(
     bindingId: string,
@@ -170,11 +170,7 @@ export class TargetHost {
     let connection = this.proofConnections.get(bindingId);
     if (!connection) {
       try {
-        const invite = validate(
-          'Invite',
-          privateJson(join(this.core.store.dir, 'bindings', bindingId, 'source-invite.json')),
-        );
-        connection = openSource(invite);
+        connection = this.openProofSource(bindingId);
         this.proofConnections.set(bindingId, connection);
         connection.catch(() => this.proofConnections.delete(bindingId));
       } catch {
@@ -197,6 +193,30 @@ export class TargetHost {
       this.proofConnections.delete(bindingId);
       return undefined;
     }
+  }
+
+  /** Proof connection for a binding: invite bindings reuse their stored invite;
+   *  standing bindings (no invite) connect as the local standing principal. */
+  private openProofSource(bindingId: string): ReturnType<typeof openSource> {
+    const binding = this.core.binding(bindingId);
+    if (binding.standing === true) {
+      const view = readSourceChannel(
+        this.core.options.home,
+        binding.proposal.sourceId,
+        binding.proposal.channelId,
+      );
+      if (!view) fail('source_not_found');
+      return openSourceLocal(view.discoveryFile, {
+        sourceId: binding.proposal.sourceId,
+        realm: view.realm,
+        credential: this.core.handle(bindingId).credential,
+      });
+    }
+    const invite = validate(
+      'Invite',
+      privateJson(join(this.core.store.dir, 'bindings', bindingId, 'source-invite.json')),
+    );
+    return openSource(invite);
   }
 
   handler(): RequestHandler {

@@ -30,6 +30,7 @@ import { privateDir } from '../platform/private-paths.js';
 export const MAIL_MAX_HOPS = 6;
 export const MAIL_MAX_BODY_BYTES = 16384;
 export const MAIL_POLL_MS = 5000;
+export const BROWSER_RECEIVER_LEASE_MS = 20_000;
 
 export interface MailPeer {
   v: 1;
@@ -51,6 +52,7 @@ export interface Mail {
   threadId: string;
   hop: number;
   sentAt: string;
+  ap_browser?: Record<string, unknown>;
 }
 
 /** What the receiving side remembers about a delivered mail (enough to reply). */
@@ -258,6 +260,50 @@ export class Mailbox {
       take(claimed);
     }
     return result.sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+  }
+
+  /** Publish readiness for the actual receiving loop. Renewals and shutdown
+   *  are fenced by epoch so an old receiver cannot replace a newer activation. */
+  publishReceiver(receiverEpoch: string, state: 'ready' | 'offline', replace = false): boolean {
+    const control = privateDir(join(this.inboxDir, '.ap-browser'));
+    const path = join(control, 'receiver.json');
+    const current = readJson<{ receiver_epoch?: unknown }>(path);
+    if (!replace && current && current.receiver_epoch !== receiverEpoch) return false;
+    const now = Date.now();
+    this.writeAtomic(path, {
+      v: 1,
+      session_id: this.self.sessionId,
+      pid: this.self.pid,
+      receiver_epoch: receiverEpoch,
+      state,
+      issued_at: now,
+      expires_at: state === 'ready' ? now + BROWSER_RECEIVER_LEASE_MS : now,
+    });
+    return true;
+  }
+
+  /** Record the browser-visible acceptance decision separately from ordinary
+   *  mailbox cleanup. Receipt files survive cleanup so the host can observe it. */
+  writeBrowserReceipt(
+    mail: Mail,
+    receiverEpoch: string,
+    status: 'accepted' | 'rejected' | 'expired',
+    message: string,
+  ): void {
+    const receipts = privateDir(join(this.inboxDir, '.ap-browser', 'receipts'));
+    const targetEpoch = mail.ap_browser?.receiver_epoch;
+    this.writeAtomic(join(receipts, mail.id + '.json'), {
+      v: 1,
+      event_id: mail.id,
+      // The sending host correlates receipts by the mail's intended route.
+      // Accepted mail has already been checked against this receiver; negative
+      // receipts deliberately echo a stale target instead of substituting the
+      // current activation and making the rejection unobservable to the sender.
+      session_id: mail.to,
+      receiver_epoch: typeof targetEpoch === 'string' ? targetEpoch : receiverEpoch,
+      status,
+      message,
+    });
   }
 
   /** Drop a claimed mail once it has been handed to the session. */
