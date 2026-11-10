@@ -466,31 +466,50 @@ export async function enroll(invite: Invite, prepared: PreparedBinding): Promise
 /** Delta-2: standing enrollment reaches the source over the same transport; the
  *  UDS socket inside the 0700 home IS the local identity (no invite credential
  *  exists). Source-side localTrust + realm + probe checks do the gating. */
-export async function enrollLocal(discoveryFile: string, prepared: PreparedBinding): Promise<MembershipProof> {
+/** Delta-2 local standing connection: same-home source reached by its discovery
+ *  file under the standing principal (no invite). Used for the standing enroll
+ *  and for Target→Source scope proofs on standing bindings. */
+export async function openSourceLocal(
+  discoveryFile: string,
+  identity: { sourceId: string; realm: string; credential: string },
+): Promise<{ rpc: RpcClient; hello: ConnectResult }> {
   const discovery = validate('Discovery', privateJson(discoveryFile));
   invariant(
     discovery.kind === 'source' &&
-      discovery.identity === prepared.proposal.sourceId &&
-      discovery.realm === prepared.proposal.realm,
+      discovery.identity === identity.sourceId &&
+      discovery.realm === identity.realm,
     'unauthorized',
   );
   const rpc = new RpcClient(discovery.endpoint);
   try {
     const hello = await rpc.open({
-      credential: prepared.handle.credential,
-      sourceId: prepared.proposal.sourceId,
+      credential: identity.credential,
+      sourceId: identity.sourceId,
       inviteId: STANDING_INVITE_ID,
       // Capability negotiation: an older source without local-standing-v1
       // rejects the connect (unsupported_feature) instead of mis-handling it.
       requiredFeatures: ['local-standing-v1'],
     });
     invariant(
-      hello.sourceId === prepared.proposal.sourceId &&
-        hello.realm === prepared.proposal.realm &&
+      hello.sourceId === identity.sourceId &&
+        hello.realm === identity.realm &&
         hello.attachmentId === discovery.attachmentId &&
         hello.ownerEpoch === discovery.ownerEpoch,
       'unauthorized',
     );
+    return { rpc, hello };
+  } catch (e) {
+    rpc.dispose();
+    throw e;
+  }
+}
+export async function enrollLocal(discoveryFile: string, prepared: PreparedBinding): Promise<MembershipProof> {
+  const { rpc } = await openSourceLocal(discoveryFile, {
+    sourceId: prepared.proposal.sourceId,
+    realm: prepared.proposal.realm,
+    credential: prepared.handle.credential,
+  });
+  try {
     return validate('MembershipProof', await rpc.call({ op: 'source.enroll', prepared }));
   } finally {
     rpc.dispose();

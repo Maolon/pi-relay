@@ -8,6 +8,7 @@ import { privateJson } from '../platform/private-paths.js';
 import { replaceDiscovery, removeIfSame } from '../platform/atomic-file.js';
 import { ManagedSource } from './managed.js';
 import { BindingClient } from '../client/index.js';
+import { STANDING_EXPIRES_AT } from '../protocol/constants.js';
 export class SourceHost {
   readonly core: SourceCore;
   readonly managed: ManagedSource;
@@ -75,15 +76,35 @@ export class SourceHost {
             return this.managed.confirmApplied(principal, params as never);
           case 'internal.source.proof': {
             // Target→Source direction (03 §3.3 step 2): the binding's invite
-            // credential authorizes proofs for its own routed events only.
-            invariant(principal.kind === 'invite', 'unauthorized');
-            const inviteRow = this.core.store.get<{ used_by: string }>(
-              'SELECT used_by FROM invites WHERE id=?',
-              principal.inviteId,
-            );
-            invariant(inviteRow?.used_by, 'unauthorized');
+            // credential (or the local standing principal) authorizes proofs
+            // for its own routed events only.
             const proofParams = params as unknown as { bindingId: string; eventIds: string[] };
-            invariant(inviteRow.used_by === proofParams.bindingId, 'unauthorized');
+            if (principal.kind === 'standing') {
+              // Delta-2 standing principal: same-uid local trust, no invite row.
+              // The proof is limited to a live standing membership on a
+              // localTrust channel; scopeProof itself only reveals events
+              // routed to that binding.
+              const row = this.core.store.get<{ state: string }>(
+                'SELECT state FROM memberships WHERE binding=?',
+                proofParams.bindingId,
+              );
+              invariant(row?.state === 'active', 'unauthorized');
+              const membership = this.core.membership(proofParams.bindingId);
+              invariant(
+                membership.expiresAt === STANDING_EXPIRES_AT &&
+                  this.core.config.channels.some(
+                    (c) => c.id === membership.channelId && c.localTrust === true,
+                  ),
+                'unauthorized',
+              );
+            } else {
+              invariant(principal.kind === 'invite', 'unauthorized');
+              const inviteRow = this.core.store.get<{ used_by: string }>(
+                'SELECT used_by FROM invites WHERE id=?',
+                principal.inviteId,
+              );
+              invariant(inviteRow?.used_by === proofParams.bindingId, 'unauthorized');
+            }
             return this.managed.scopeProof(proofParams.bindingId, proofParams.eventIds);
           }
           case 'owner.setup.commit':
